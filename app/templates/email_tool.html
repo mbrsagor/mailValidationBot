@@ -34,34 +34,67 @@
   <script>
     document.getElementById('emailForm').onsubmit = async (e) => {
       e.preventDefault()
-      const formData = new FormData(e.target)
-      document.getElementById('startBtn').disabled = true
-      document.getElementById('progressContainer').style.display = 'block'
     
-      const response = await fetch('', { method: 'POST', body: formData })
-      const data = await response.json()
-      checkProgress(data.task_id)
+      const startBtn = document.getElementById('startBtn')
+      const formData = new FormData(e.target)
+    
+      // Disable UI and show progress
+      startBtn.disabled = true
+      startBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Processing...'
+      document.getElementById('progressContainer').style.display = 'block'
+      document.getElementById('downloadBtn').style.display = 'none'
+    
+      try {
+        const response = await fetch("{% url 'email_tool' %}", {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-CSRFToken': '{{ csrf_token }}' // Standard way to handle CSRF in JS
+          }
+        })
+    
+        const data = await response.json()
+    
+        if (data.task_id) {
+          checkProgress(data.task_id)
+        } else {
+          alert('Error starting task. Please try again.')
+          startBtn.disabled = false
+          startBtn.innerText = 'Start Validation'
+        }
+      } catch (error) {
+        console.error('Error:', error)
+        startBtn.disabled = false
+      }
     }
     
     function checkProgress(taskId) {
       const interval = setInterval(async () => {
+        // Using backticks for dynamic URL
         const res = await fetch(`/progress/${taskId}/`)
         const data = await res.json()
     
         if (data.state === 'PROGRESS' || data.state === 'SUCCESS') {
           const percent = data.percent || 0
-          document.getElementById('progressBar').style.width = percent + '%'
-          document.getElementById('progressBar').innerText = percent + '%'
+          const pBar = document.getElementById('progressBar')
+          pBar.style.width = percent + '%'
+          pBar.innerText = percent + '%'
         }
     
         if (data.state === 'SUCCESS') {
           clearInterval(interval)
-          document.getElementById('statusText').innerText = 'Finished!'
+          document.getElementById('statusText').innerText = 'Validation Complete!'
+          document.getElementById('statusText').classList.replace('text-muted', 'text-success')
+    
           const dlBtn = document.getElementById('downloadBtn')
           dlBtn.href = data.file_url
           dlBtn.style.display = 'inline-block'
+    
+          const startBtn = document.getElementById('startBtn')
+          startBtn.disabled = false
+          startBtn.innerText = 'Start New Validation'
         }
-      }, 2000) // Check every 2 seconds
+      }, 2000)
     }
   </script>
 {% endblock %}
