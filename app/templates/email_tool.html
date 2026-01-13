@@ -1,0 +1,64 @@
+{% block title %}
+  Email Validation Tool
+{% endblock %}
+
+{% block content %}
+  <div class="container mt-5">
+    <div class="row">
+      <div class="col-md-12">
+        <div class="card">
+          <div class="card-body">
+            <h2>Email Bulk Validator (50k Limit)</h2>
+            <form id="emailForm">
+              {% csrf_token %}
+              <textarea name="emails" id="emails" class="form-control" rows="10" placeholder="Paste emails here..."></textarea>
+              <button type="submit" class="btn btn-primary mt-3" id="startBtn">Start Validation</button>
+            </form>
+
+            <div id="progressContainer" class="mt-4" style="display:none;">
+              <div class="progress">
+                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%">0%</div>
+              </div>
+              <p id="statusText" class="mt-2 text-muted">Processing...</p>
+              <a id="downloadBtn" href="#" class="btn btn-success" style="display:none;" download>Download Valid List</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('emailForm').onsubmit = async (e) => {
+      e.preventDefault()
+      const formData = new FormData(e.target)
+      document.getElementById('startBtn').disabled = true
+      document.getElementById('progressContainer').style.display = 'block'
+    
+      const response = await fetch('', { method: 'POST', body: formData })
+      const data = await response.json()
+      checkProgress(data.task_id)
+    }
+    
+    function checkProgress(taskId) {
+      const interval = setInterval(async () => {
+        const res = await fetch(`/progress/${taskId}/`)
+        const data = await res.json()
+    
+        if (data.state === 'PROGRESS' || data.state === 'SUCCESS') {
+          const percent = data.percent || 0
+          document.getElementById('progressBar').style.width = percent + '%'
+          document.getElementById('progressBar').innerText = percent + '%'
+        }
+    
+        if (data.state === 'SUCCESS') {
+          clearInterval(interval)
+          document.getElementById('statusText').innerText = 'Finished!'
+          const dlBtn = document.getElementById('downloadBtn')
+          dlBtn.href = data.file_url
+          dlBtn.style.display = 'inline-block'
+        }
+      }, 2000) // Check every 2 seconds
+    }
+  </script>
+{% endblock %}
