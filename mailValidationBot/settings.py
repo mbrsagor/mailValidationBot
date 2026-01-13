@@ -141,3 +141,6 @@ CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+# Data upload size limit
+DATA_UPLOAD_MAX_MEMORY_SIZE = 10485760  # Set to 10MB

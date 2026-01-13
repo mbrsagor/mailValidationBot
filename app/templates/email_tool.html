@@ -1,3 +1,5 @@
+{% extends 'base.html' %}
+
 {% block title %}
   Email Validation Tool
 {% endblock %}
@@ -11,7 +13,8 @@
             <h2>Email Bulk Validator (50k Limit)</h2>
             <form id="emailForm">
               {% csrf_token %}
-              <textarea name="emails" id="emails" class="form-control" rows="10" placeholder="Paste emails here..."></textarea>
+              <label class="form-label">Paste Emails (Comma, Space, or New Line separated)</label>
+              <textarea name="emails" id="emails" class="form-control mb-3" rows="10" placeholder="Paste emails here..."></textarea>
               <button type="submit" class="btn btn-primary mt-3" id="startBtn">Start Validation</button>
             </form>
 
