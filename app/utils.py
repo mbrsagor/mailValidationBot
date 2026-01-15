@@ -1,5 +1,5 @@
 import dns.resolver
-from email_validator import validate_email, EmailNotValidError
+from email_validator import validate_email
 
 def is_valid_email(email):
     email = email.strip()

@@ -10,7 +10,7 @@
       <div class="col-md-12">
         <div class="card">
           <div class="card-body">
-            <h2>Email Bulk Validator (50k Limit)</h2>
+            <h2>Email Bulk Validator (50k Max Limit)</h2>
             <form id="emailForm">
               {% csrf_token %}
               <label class="form-label">Paste Emails (Comma, Space, or New Line separated)</label>
@@ -74,6 +74,7 @@
         const res = await fetch(`/progress/${taskId}/`)
         const data = await res.json()
     
+        // Update progress bar
         if (data.state === 'PROGRESS' || data.state === 'SUCCESS') {
           const percent = data.percent || 0
           const pBar = document.getElementById('progressBar')
@@ -81,15 +82,18 @@
           pBar.innerText = percent + '%'
         }
     
+        // When task is complete
         if (data.state === 'SUCCESS') {
           clearInterval(interval)
           document.getElementById('statusText').innerText = 'Validation Complete!'
           document.getElementById('statusText').classList.replace('text-muted', 'text-success')
     
+          // Show download link
           const dlBtn = document.getElementById('downloadBtn')
           dlBtn.href = data.file_url
           dlBtn.style.display = 'inline-block'
     
+          // Re-enable start button
           const startBtn = document.getElementById('startBtn')
           startBtn.disabled = false
           startBtn.innerText = 'Start New Validation'
