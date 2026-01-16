@@ -1,13 +1,14 @@
 import os
+import asyncio
+import aiodns
 from celery import shared_task, current_task
 from django.conf import settings
 from .utils import is_valid_email
+from .utils import async_validate_email
 
 
 @shared_task(bind=True)
 def validate_emails_task(self, email_list):
-    import asyncio
-    from .utils import async_validate_email
 
     total = len(email_list)
     valid_emails = []
