@@ -3,6 +3,9 @@ import aiosmtplib
 import aiodns
 from email_validator import validate_email
 from django.conf import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Initialize shared resolver - MOVED inside functions to avoid "no event loop" error at import time
 # resolver = aiodns.DNSResolver() 
@@ -12,8 +15,8 @@ def is_valid_email(email):
     # For backward compatibility with single check view if any
     try:
         return asyncio.run(async_validate_email(email))
-    except Exception:
-        # print(f"Global error for {email}: {e}")
+    except Exception as e:
+        logger.error(f"Global error for {email}: {e}")
         return None
 
 async def async_validate_email(email, resolver=None):
@@ -33,12 +36,14 @@ async def async_validate_email(email, resolver=None):
         try:
             records = await resolver.query(domain, 'MX')
             mx_record = str(sorted(records, key=lambda r: r.priority)[0].host)
-        except Exception:
+        except Exception as e:
+            logger.debug(f"MX lookup failed for {email}: {e}")
             # Fallback to A record
             try:
                 await resolver.query(domain, 'A')
                 mx_record = domain
-            except Exception:
+            except Exception as e:
+                logger.debug(f"A lookup failed for {email}: {e}")
                 return None
 
         # 3. SMTP Conversation (Async)
@@ -46,10 +51,11 @@ async def async_validate_email(email, resolver=None):
         
         # Connect
         # Disable STARTTLS for speed and to avoid certificate errors on dev machines
-        smtp = aiosmtplib.SMTP(hostname=mx_host, port=25, timeout=5, start_tls=False, use_tls=False)
+        smtp = aiosmtplib.SMTP(hostname=mx_host, port=25, timeout=10, start_tls=False, use_tls=False)
         try:
             await smtp.connect()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"SMTP Connect failed for {email} ({mx_host}): {e}")
             return None
             
         try:
@@ -69,8 +75,10 @@ async def async_validate_email(email, resolver=None):
                 return email
             return None
             
-        except Exception:
+        except Exception as e:
+            logger.error(f"SMTP Error for {email}: {e}")
             return None
             
-    except Exception:
+    except Exception as e:
+        logger.error(f"General Error for {email}: {e}")
         return None

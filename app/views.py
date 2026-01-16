@@ -7,22 +7,7 @@ from celery.result import AsyncResult
 # View to handle email validation requests
 def email_tool_view(request):
     if request.method == "POST":
-        email_list = []
-        
-        # Check if file was uploaded
-        if 'email_file' in request.FILES:
-            uploaded_file = request.FILES['email_file']
-            # Read file content
-            try:
-                # Assuming text file with each email on new line or comma separated
-                file_content = uploaded_file.read().decode('utf-8')
-                raw_input = file_content
-            except Exception as e:
-                return JsonResponse({'error': f'Error reading file: {str(e)}'}, status=400)
-        else:
-            # Fallback to text area
-            raw_input = request.POST.get('emails', '')
-            
+        raw_input = request.POST.get('emails', '')
         
         # Split by comma, space, or any type of new line
         email_list = re.split(r'[,\s\n\r]+', raw_input)

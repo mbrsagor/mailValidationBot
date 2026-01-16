@@ -1,9 +1,9 @@
 import os
 import asyncio
 import aiodns
-from celery import shared_task, current_task
+from celery import shared_task
 from django.conf import settings
-from .utils import is_valid_email
+
 from .utils import async_validate_email
 
 
