@@ -135,6 +135,7 @@ EMAIL_PORT = env("EMAIL_PORT")
 EMAIL_HOST_USER = env("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 EMAIL_USE_TLS = env("EMAIL_USE_TLS")
+VERIFIER_EMAIL = env("VERIFIER_EMAIL", default='verify@example.com')
 
 # Celery Configuration
 CELERY_BROKER_URL = 'redis://localhost:6379/0'

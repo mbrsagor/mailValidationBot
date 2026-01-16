@@ -13,6 +13,13 @@
             <h2>Email Bulk Validator (50k Max Limit)</h2>
             <form id="emailForm">
               {% csrf_token %}
+              <div class="mb-3">
+                <label for="email_file" class="form-label">Upload File (.txt, .csv)</label>
+                <input class="form-control" type="file" id="email_file" name="email_file">
+              </div>
+              
+              <div class="text-center my-3">OR</div>
+
               <label class="form-label">Paste Emails (Comma, Space, or New Line separated)</label>
               <textarea name="emails" id="emails" class="form-control mb-3" rows="10" placeholder="Paste emails here..."></textarea>
               <button type="submit" class="btn btn-primary mt-3" id="startBtn">Start Validation</button>
