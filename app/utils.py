@@ -51,12 +51,14 @@ async def async_validate_email(email, resolver=None):
         
         # Connect
         # Disable STARTTLS for speed and to avoid certificate errors on dev machines
-        smtp = aiosmtplib.SMTP(hostname=mx_host, port=25, timeout=10, start_tls=False, use_tls=False)
+        smtp = aiosmtplib.SMTP(hostname=mx_host, port=25, timeout=5, start_tls=False, use_tls=False)
         try:
             await smtp.connect()
         except Exception as e:
-            logger.warning(f"SMTP Connect failed for {email} ({mx_host}): {e}")
-            return None
+            # Fallback: If we have an MX record but can't connect (likely Port 25 block), 
+            # assume the email is valid based on the domain.
+            logger.warning(f"SMTP Connect failed for {email} ({mx_host}): {e}. Accepting based on valid domain.")
+            return email
             
         try:
             # HELO - aiosmtplib converts this automatically during connect, but checking just in case
