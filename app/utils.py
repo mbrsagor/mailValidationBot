@@ -1,64 +1,76 @@
-import smtplib
-import socket
-import dns.resolver
+import asyncio
+import aiosmtplib
+import aiodns
 from email_validator import validate_email
+from django.conf import settings
+
+# Initialize shared resolver - MOVED inside functions to avoid "no event loop" error at import time
+# resolver = aiodns.DNSResolver() 
 
 def is_valid_email(email):
+    # Wrapper for sync calls if needed, but we should prefer async for bulk
+    # For backward compatibility with single check view if any
+    try:
+        return asyncio.run(async_validate_email(email))
+    except Exception:
+        # print(f"Global error for {email}: {e}")
+        return None
+
+async def async_validate_email(email, resolver=None):
     email = email.strip()
+    
+    # Create resolver if not provided (inefficient for bulk, efficient for single)
+    if resolver is None:
+        resolver = aiodns.DNSResolver()
+        
     try:
         # 1. Check syntax
         valid = validate_email(email, check_deliverability=False)
         domain = valid.domain
         
-        # 2. Get MX Record
+        # 2. Get MX Record (Async)
+        mx_record = None
         try:
-            records = dns.resolver.resolve(domain, 'MX')
-            mx_record = str(sorted(records, key=lambda r: r.preference)[0].exchange)
+            records = await resolver.query(domain, 'MX')
+            mx_record = str(sorted(records, key=lambda r: r.priority)[0].host)
         except Exception:
-            # Fallback to A record if MX missing (rare but possible per RFC)
-            # But for "active webmail" often strict MX is safer. Let's try A record just in case.
+            # Fallback to A record
             try:
-                dns.resolver.resolve(domain, 'A')
+                await resolver.query(domain, 'A')
                 mx_record = domain
-            except:
+            except Exception:
                 return None
 
-        # 3. SMTP Conversation (Existence Check)
-        # Connect to the mail server
-        server = smtplib.SMTP(timeout=5)
-        server.set_debuglevel(0)
-        
-        # MX record might end with a dot
+        # 3. SMTP Conversation (Async)
         mx_host = mx_record.rstrip('.')
         
+        # Connect
+        # Disable STARTTLS for speed and to avoid certificate errors on dev machines
+        smtp = aiosmtplib.SMTP(hostname=mx_host, port=25, timeout=5, start_tls=False, use_tls=False)
         try:
-            code, message = server.connect(mx_host)
-            if code != 220:
-                server.quit()
-                return None
-        except (socket.timeout, socket.error):
-            return None
-
-        # HELO
-        server.helo('localhost') # Ideally use a valid FQDN here
-        
-        # MAIL FROM
-        from django.conf import settings
-        sender = settings.VERIFIER_EMAIL
-        code, message = server.mail(sender)
-        if code != 250:
-            server.quit()
-            return None
-        
-        # RCPT TO - This is the real check
-        code, message = server.rcpt(email)
-        server.quit()
-        
-        if code == 250:
-            return email
-        else:
+            await smtp.connect()
+        except Exception:
             return None
             
-    except Exception as e:
-        # If any unexpected error occurs, assume invalid or unverifiable
+        try:
+            # HELO - aiosmtplib converts this automatically during connect, but checking just in case
+            # await smtp.helo('localhost') 
+            
+            # MAIL FROM
+            sender = settings.VERIFIER_EMAIL
+            await smtp.mail(sender)
+            
+            # RCPT TO
+            code, message = await smtp.rcpt(email)
+            
+            await smtp.quit()
+            
+            if code == 250:
+                return email
+            return None
+            
+        except Exception:
+            return None
+            
+    except Exception:
         return None

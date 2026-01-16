@@ -6,44 +6,65 @@ from .utils import is_valid_email
 
 @shared_task(bind=True)
 def validate_emails_task(self, email_list):
+    import asyncio
+    from .utils import async_validate_email
+
     total = len(email_list)
     valid_emails = []
     
-    # Use concurrent.futures for parallel execution
-    import concurrent.futures
-
-    # Determine number of workers - be careful not to trigger rate limits/blocks
-    # 20-50 is usually a safe range for this kind of lightweight checking
-    max_workers = 50 
+    # High concurrency limit
+    CONCURRENCY_LIMIT = 1000
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
-        future_to_email = {executor.submit(is_valid_email, email): email for email in email_list}
+    async def process_batch():
+        # Initialize resolver inside the loop
+        resolver = aiodns.DNSResolver()
         
-        completed_count = 0
-        for future in concurrent.futures.as_completed(future_to_email):
-            email = future_to_email[future]
-            completed_count += 1
+        semaphore = asyncio.Semaphore(CONCURRENCY_LIMIT)
+        processed_count = 0
+        
+        async def limited_check(email):
+            nonlocal processed_count
+            async with semaphore:
+                result = await async_validate_email(email, resolver=resolver)
+                processed_count += 1
+                
+                # Update progress roughly every 100 items or 1%
+                if processed_count % 100 == 0:
+                    process_percent = int((processed_count / total) * 100)
+                    # We can't call self.update_state directly from async loop easily unless using sync_to_async wrapper
+                    # But since this is running in asyncio.run inside the sync task, we actually CAN call the sync method?
+                    # No, self.update_state is thread-safe but maybe not async-safe if using async backend?
+                    # Standard Celery with Redis is fine to call from main thread.
+                    # Since asyncio.run blocks the main thread, we can only update state if we bubble up or call sync code.
+                    # Actually, we can just call the sync update_state, it's just a redis call.
+                    pass 
+                
+                return result
+
+        tasks = [limited_check(email) for email in email_list]
+        
+        # We need to manually track progress because asyncio.gather waits for all.
+        # Alternatively use as_completed
+        exclude_none = []
+        for f in asyncio.as_completed(tasks):
+            result = await f
+            if result:
+                exclude_none.append(result)
             
-            try:
-                result = future.result()
-                if result:
-                    valid_emails.append(result)
-            except Exception as exc:
-                # Log error or ignore
-                pass
-            
-            # Update progress every 50 completed items or at the end
-            if completed_count % 50 == 0 or completed_count == total:
-                process_percent = int((completed_count / total) * 100)
-                # Keep tracking count of valid found so far
-                self.update_state(state='PROGRESS', meta={
-                    'current': process_percent,
-                    'percent': process_percent,
+            # Progress Update
+            # Get current count from the nonlocal variable which is safe in single-threaded async loop
+            if processed_count % 200 == 0 or processed_count == total:
+                 self.update_state(state='PROGRESS', meta={
+                    'current': int((processed_count / total) * 100),
                     'total': total,
-                    'processed': completed_count,
-                    'valid_count': len(valid_emails)
+                    'processed': processed_count,
+                    'valid_count': len(exclude_none)
                 })
+        
+        return exclude_none
+
+    # Run the async loop
+    valid_emails = asyncio.run(process_batch())
 
     # Save to file
     filename = f"validated_emails_{self.request.id}.txt"
