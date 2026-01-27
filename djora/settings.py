@@ -50,6 +50,7 @@ DEFAULT_APPS = [
 
 CUSTOM_APPS = [
     'user',
+    'frontend',
 ]
 
 INSTALLED_APPS = DEFAULT_APPS + CUSTOM_APPS
