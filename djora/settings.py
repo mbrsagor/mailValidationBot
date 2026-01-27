@@ -142,5 +142,6 @@ STATICFILES_DIRS = [
 ]
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Auth user model
+# Custom User Model
 AUTH_USER_MODEL = 'user.User'
+AUTHENTICATION_BACKENDS = ['utils.backend.EmailPhoneAuthenticationBackend']
